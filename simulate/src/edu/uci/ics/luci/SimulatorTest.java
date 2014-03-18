@@ -9,22 +9,26 @@ import org.junit.Test;
 
 public class SimulatorTest {
 	
-	final double e = 0.000001d;
+	final double e = 0.001d;
 
 	@Test
 	public void test() {
 		double hertz = 1.0;
 		TreeMap<Long, GeoPoint> r = Simulator.makeRandomTweets(hertz);
-		assertTrue((Simulator.END/(1000/hertz) - r.size()) < e);
+		//System.out.println((Simulator.END*hertz)/1000.0d+" "+ r.size());
+		assertTrue(Math.abs((Simulator.END*hertz)/1000.0d - r.size()) <= 2000);
 		assertTrue((r.lastEntry().getKey() - r.firstEntry().getKey()) > (Simulator.END - 2*(1000.0/hertz)));
 		
 		hertz = 2.0;
 		r = Simulator.makeRandomTweets(hertz);
-		assertTrue((Simulator.END/(1000/hertz) - r.size()) < e);
+		//System.out.println((Simulator.END*hertz)/1000.0d+" "+ r.size());
+		assertTrue(Math.abs((Simulator.END*hertz)/1000.0d - r.size()) <= 2000);
 		assertTrue((r.lastEntry().getKey() - r.firstEntry().getKey()) > (Simulator.END - 2*(1000.0/hertz)));
 		
-		r = Simulator.makeRandomTweets(50);
-		assertTrue((Simulator.END/(1000/hertz) - r.size()) < e);
+		hertz = 100.0;
+		r = Simulator.makeRandomTweets(hertz);
+		//System.out.println((Simulator.END*hertz)/1000.0d+" "+ r.size());
+		assertTrue(Math.abs((Simulator.END*hertz)/1000.0d - r.size()) <= 2000);
 		assertTrue((r.lastEntry().getKey() - r.firstEntry().getKey()) > (Simulator.END - 2*(1000.0/hertz)));
 		
 		for(Entry<Long, GeoPoint> e: r.entrySet()){
@@ -47,14 +51,14 @@ public class SimulatorTest {
 		for(int i=0; i < 10 ; i++){
 			x = Simulator.determineLocation(i, trace);
 			//System.out.println("("+x.getLatitude()+","+x.getLongitude()+")");
-			assertTrue((x.getLatitude() - (i+0.0d)) < e);
-			assertTrue((x.getLongitude() - (i+0.0d)) < e);
+			assertTrue(Math.abs(x.getLatitude() - (i+0.0d)) < e);
+			assertTrue(Math.abs(x.getLongitude() - (i+0.0d)) < e);
 		}
 		for(int i=10; i < 20 ; i++){
 			x = Simulator.determineLocation(i, trace);
 			//System.out.println("("+x.getLatitude()+","+x.getLongitude()+")");
-			assertTrue((x.getLatitude() - (10.0d)) < e);
-			assertTrue((x.getLongitude() - (i+0.0d)) < e);
+			assertTrue(Math.abs(x.getLatitude() - (10.0d)) < e);
+			assertTrue(Math.abs(x.getLongitude() - (i+0.0d)) < e);
 		}
 		
 	}

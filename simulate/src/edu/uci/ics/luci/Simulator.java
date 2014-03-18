@@ -9,14 +9,15 @@ import java.util.TreeMap;
 
 public class Simulator {
 	
-	static double top = 90.0d;
-	static double bottom = 0.0d;
-	static double left = -90.0d;
-	static double right = 0.0d;
+	static double top = -1*Double.MAX_VALUE;
+	static double bottom = Double.MAX_VALUE;
+	static double left = Double.MAX_VALUE;
+	static double right = -1*Double.MAX_VALUE;
 	static final int ONE_SEC = 1000;
 	static final int ONE_MIN = 60* ONE_SEC;
 	static final int ONE_HOUR = 60* ONE_MIN;
-	static int END = ONE_HOUR;
+	//static int END = ONE_HOUR;
+	static int END = 7158999;
 	
 	static final double WAKEUP_COST = 0.01;
 	static final double LOCATION_ANNOUNCE_COST = 0.50;
@@ -29,8 +30,8 @@ public class Simulator {
 		
 		TreeMap<Long,GeoPoint> ret  = new TreeMap<Long,GeoPoint>();
 		
-		for(double i=0.0 ;i < END; i+= (1000.0/hertz)){
-			double jitter = r.nextDouble() * (1000.0/hertz);
+		for(double i=0.0d ;i < END; i+= (1000.0d/hertz)){
+			double jitter = r.nextDouble() * (1000.0d/hertz);
 			double latitude = r.nextDouble() * (top-bottom) + bottom;
 			double longitude = r.nextDouble() * (right-left) + left;
 			ret.put(Math.round(i+jitter), new GeoPoint(latitude,longitude));
@@ -64,7 +65,7 @@ public class Simulator {
 
 		Scanner fileScanner = null;
 		try {
-			fileScanner = new Scanner(new File("trace.txt"));
+			fileScanner = new Scanner(new File("location_trace.txt"));
 			while (fileScanner.hasNext()) {
 				String next = fileScanner.nextLine();
 				String[] split = next.split("[\\t\\s]");
@@ -72,6 +73,19 @@ public class Simulator {
 				Double latitude = Double.valueOf(split[1]);
 				Double longitude = Double.valueOf(split[2]);
 				trace.put(time, new GeoPoint(latitude,longitude));
+				
+				if(latitude > top){
+					top = latitude;
+				}
+				if(latitude < bottom){
+					bottom = latitude;
+				}
+				if(longitude > right){
+					right = longitude;
+				}
+				if(longitude < left){
+					left = longitude;
+				}
 			}
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
@@ -80,6 +94,12 @@ public class Simulator {
 				fileScanner.close();
 			}
 		}
+		System.out.println("top: "+top);
+		System.out.println("bottom: "+bottom);
+		System.out.println("Height in km: "+GeoPoint._distance(top,left,bottom,left,'K'));
+		System.out.println("left: "+left);
+		System.out.println("right: "+right);
+		System.out.println("Width in km: "+GeoPoint._distance(top,left,top,right,'K'));
 		
 		
 		TreeMap<Integer,TreeMap<Long, GeoPoint>> trials = new TreeMap<Integer,TreeMap<Long, GeoPoint>>();
@@ -91,12 +111,16 @@ public class Simulator {
 			throw new RuntimeException("top: "+right+" >= bottom: "+left);
 		}
 		
-		for(int i=1; i<1000; i+=100){
-			trials.put(i,makeRandomTweets(i));
+		for(int i=1; i<1000; i+=75){
+			if(i == 1){
+				trials.put(i,makeRandomTweets(i));
+			}
+			else{
+				trials.put(i-1,makeRandomTweets(i-1));
+			}
 		}
 		
 		/*Naive push */
-		System.out.println("Naive Push:");
 		System.out.println("Hertz:	Naive Push:	Smart Push:");
 		for(Entry<Integer, TreeMap<Long, GeoPoint>> trial :trials.entrySet()){
 			TreeMap<String, Double> cost = new TreeMap<String,Double>();
@@ -115,7 +139,7 @@ public class Simulator {
 			{
 				cost.put("Smart Push",0.0d);
 				TreeMap<Long, GeoPoint> tweets = trial.getValue();
-				double range = 2.0d;
+				double range = 1.0d;
 				for(long i=0; i < END ; i++){
 					GeoPoint location = determineLocation(i,trace);
 					if(tweets.containsKey(i)){
