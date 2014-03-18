@@ -22,4 +22,10 @@ public class GeoPoint {
 		this.longitude = longitude;
 	}
 
+	public double distance(GeoPoint p) {
+		double y = this.getLatitude() - p.getLatitude(); 
+		double x = this.getLongitude() - p.getLongitude(); 
+		return Math.sqrt(x*x + y*y);
+	}
+
 }
