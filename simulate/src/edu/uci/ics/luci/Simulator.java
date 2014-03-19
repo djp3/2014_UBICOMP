@@ -110,14 +110,15 @@ public class Simulator {
 				fileScanner.close();
 			}
 		}
-		System.out.println("top: "+top);
-		System.out.println("bottom: "+bottom);
-		System.out.println("Height in km: "+GeoPoint._distance(top,left,bottom,left,'K'));
-		System.out.println("left: "+left);
-		System.out.println("right: "+right);
-		System.out.println("Width in km: "+GeoPoint._distance(top,left,top,right,'K'));
-		System.out.println("fast: "+fast);
-		System.out.println("slow: "+slow);
+		System.out.println("Trace stats:");
+		System.out.println("\tHeight in km: "+GeoPoint._distance(top,left,bottom,left,'K'));
+		System.out.println("\t\ttop: "+top);
+		System.out.println("\t\tbottom: "+bottom);
+		System.out.println("\tWidth in km: "+GeoPoint._distance(top,left,top,right,'K'));
+		System.out.println("\t\tleft: "+left);
+		System.out.println("\t\tright: "+right);
+		System.out.println("\tmax speed: "+fast);
+		System.out.println("\tmin speed: "+slow);
 		
 		
 		TreeMap<Integer,TreeMap<Long, GeoPoint>> trials = new TreeMap<Integer,TreeMap<Long, GeoPoint>>();
