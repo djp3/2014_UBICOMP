@@ -26,9 +26,9 @@ public class Simulator {
 	//END matches trace Tao collected
 	static int END = 7158999;
 	
-	static final double WAKEUP_COST = 0.01;
-	static final double LOCATION_ANNOUNCE_COST = 0.50;
-	static final double TRANSMIT_COST = 1.00;
+	static final double WAKEUP_COST = 0.001;
+	static final double LOCATION_ANNOUNCE_COST = 0.150;
+	static final double TRANSMIT_COST = 0.001;
 	
 	static Random r = new Random(10L);
 	
@@ -148,7 +148,7 @@ public class Simulator {
 		System.out.println("\tDone");
 		
 		
-		double range = 2.0d;
+		double range = 0.5d;
 		
 		System.out.println("\nHertz\tNaive Push\tSmart Push\tNaive Pull\tSmart Pull\tStatic Geofence\tGeoJourney");
 		for(Entry<Integer, TreeMap<Long, GeoPoint>> trial :trials.entrySet()){
@@ -210,6 +210,8 @@ public class Simulator {
 				}
 			}
 			
+			double timeBoundary = 60.0d;
+			
 			{
 				cost.put("Static Geofence",0.0d);
 				TreeMap<Long, GeoPoint> tweets = trial.getValue();
@@ -226,7 +228,7 @@ public class Simulator {
 					if((geoFenceCenter == null) || (location.distance(geoFenceCenter) > geoFenceInnerRadius)){
 						//Update center
 						geoFenceCenter = new GeoPoint(location);
-						geoFenceInnerRadius = (location.getSpeed() * 60)/1000; //in km
+						geoFenceInnerRadius = (location.getSpeed() * timeBoundary)/1000; //in km
 						if(geoFenceInnerRadius < 0.025){
 							geoFenceInnerRadius = 0.025;
 						}
@@ -264,7 +266,7 @@ public class Simulator {
 					if((geoFenceCenter == null) || (location.distance(geoFenceCenter) > geoFenceInnerRadius)){
 						//Update center
 						geoFenceCenter = new GeoPoint(location);
-						geoFenceInnerRadius = (location.getSpeed() * 60)/1000; //in km
+						geoFenceInnerRadius = (location.getSpeed() * timeBoundary)/1000; //in km
 						if(geoFenceInnerRadius < 0.025){
 							geoFenceInnerRadius = 0.025;
 						}
@@ -296,13 +298,16 @@ public class Simulator {
 				}
 			}
 			
+			double hours = (END+0.0d)/(1000.0d*60.0d*60.0d);
+			//System.out.print("hours"+hours);
 			System.out.print(trial.getKey()+"\t");
-			System.out.print(cost.get("Naive Push")+"\t");
-			System.out.print(cost.get("Smart Push")+"\t");
-			System.out.print(cost.get("Naive Pull")+"\t");
-			System.out.print(cost.get("Smart Pull")+"\t");
-			System.out.print(cost.get("Static Geofence")+"\t");
-			System.out.print(cost.get("GeoJourney")+"\t");
+			
+			System.out.print(cost.get("Naive Push")/hours+"\t");
+			System.out.print(cost.get("Smart Push")/hours+"\t");
+			System.out.print(cost.get("Naive Pull")/hours+"\t");
+			System.out.print(cost.get("Smart Pull")/hours+"\t");
+			System.out.print(cost.get("Static Geofence")/hours+"\t");
+			System.out.print(cost.get("GeoJourney")/hours+"\t");
 			System.out.println();
 		}
 		
