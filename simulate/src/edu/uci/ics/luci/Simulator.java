@@ -3,6 +3,7 @@ package edu.uci.ics.luci;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Map.Entry;
+import java.util.NavigableMap;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.TreeMap;
@@ -11,8 +12,13 @@ public class Simulator {
 	
 	static double top = -1*Double.MAX_VALUE;
 	static double bottom = Double.MAX_VALUE;
+	
 	static double left = Double.MAX_VALUE;
 	static double right = -1*Double.MAX_VALUE;
+	
+	static double slow = Double.MAX_VALUE;
+	static double fast = -1*Double.MAX_VALUE;
+	
 	static final int ONE_SEC = 1000;
 	static final int ONE_MIN = 60* ONE_SEC;
 	static final int ONE_HOUR = 60* ONE_MIN;
@@ -34,7 +40,8 @@ public class Simulator {
 			double jitter = r.nextDouble() * (1000.0d/hertz);
 			double latitude = r.nextDouble() * (top-bottom) + bottom;
 			double longitude = r.nextDouble() * (right-left) + left;
-			ret.put(Math.round(i+jitter), new GeoPoint(latitude,longitude));
+			double speed = 0.0d; //speed of a tweet?  
+			ret.put(Math.round(i+jitter), new GeoPoint(latitude,longitude,speed));
 		}
 		
 		return ret;
@@ -54,7 +61,8 @@ public class Simulator {
 		double fraction = (interval+0.0d) / ((after.getKey()-before.getKey())+0.0d);
 		double latitude = fraction * (after.getValue().getLatitude() - before.getValue().getLatitude()) + before.getValue().getLatitude();
 		double longitude = fraction * (after.getValue().getLongitude() - before.getValue().getLongitude()) + before.getValue().getLongitude();
-		return new GeoPoint(latitude, longitude);
+		double speed = fraction * (after.getValue().getSpeed() - before.getValue().getSpeed()) + before.getValue().getSpeed();
+		return new GeoPoint(latitude, longitude,speed);
 	}
 	
 	/**
@@ -72,7 +80,8 @@ public class Simulator {
 				Long time = Long.valueOf(split[0]);
 				Double latitude = Double.valueOf(split[1]);
 				Double longitude = Double.valueOf(split[2]);
-				trace.put(time, new GeoPoint(latitude,longitude));
+				Double speed = Double.valueOf(split[3]);
+				trace.put(time, new GeoPoint(latitude,longitude,speed));
 				
 				if(latitude > top){
 					top = latitude;
@@ -85,6 +94,12 @@ public class Simulator {
 				}
 				if(longitude < left){
 					left = longitude;
+				}
+				if(speed > fast){
+					fast = speed;
+				}
+				if(speed < slow){
+					slow = speed;
 				}
 			}
 		} catch (FileNotFoundException e) {
@@ -100,6 +115,8 @@ public class Simulator {
 		System.out.println("left: "+left);
 		System.out.println("right: "+right);
 		System.out.println("Width in km: "+GeoPoint._distance(top,left,top,right,'K'));
+		System.out.println("fast: "+fast);
+		System.out.println("slow: "+slow);
 		
 		
 		TreeMap<Integer,TreeMap<Long, GeoPoint>> trials = new TreeMap<Integer,TreeMap<Long, GeoPoint>>();
@@ -110,8 +127,14 @@ public class Simulator {
 		if(right < left){
 			throw new RuntimeException("top: "+right+" >= bottom: "+left);
 		}
+		if(fast < slow){
+			throw new RuntimeException("fast: "+fast+" >= slow: "+slow);
+		}
+		if((fast < 0.0d) || (slow < 0.0d)){
+			throw new RuntimeException("fast: "+fast+" or slow: "+slow+" is less than 0");
+		}
 		
-		for(int i=1; i<1000; i+=75){
+		for(int i=1; i<1000; i+= 75){
 			if(i == 1){
 				trials.put(i,makeRandomTweets(i));
 			}
@@ -120,8 +143,10 @@ public class Simulator {
 			}
 		}
 		
-		/*Naive push */
-		System.out.println("Hertz:	Naive Push:	Smart Push:");
+		
+		double range = 2.0d;
+		
+		System.out.println("Hertz\tNaive Push\tSmart Push\tNaive Pull\tSmart Pull\tStatic Geofence\tGeoJourney");
 		for(Entry<Integer, TreeMap<Long, GeoPoint>> trial :trials.entrySet()){
 			TreeMap<String, Double> cost = new TreeMap<String,Double>();
 			
@@ -139,7 +164,6 @@ public class Simulator {
 			{
 				cost.put("Smart Push",0.0d);
 				TreeMap<Long, GeoPoint> tweets = trial.getValue();
-				double range = 1.0d;
 				for(long i=0; i < END ; i++){
 					GeoPoint location = determineLocation(i,trace);
 					if(tweets.containsKey(i)){
@@ -154,9 +178,75 @@ public class Simulator {
 				}
 			}
 			
+			long pollInterval = 5*ONE_MIN;
+			{
+				cost.put("Naive Pull",0.0d);
+				TreeMap<Long, GeoPoint> tweets = trial.getValue();
+				for(long i=0; i < END ; i += pollInterval){
+					NavigableMap<Long, GeoPoint> pulledTweets = tweets.subMap(i-pollInterval, false, i, true);
+					cost.put("Naive Pull", WAKEUP_COST + pulledTweets.size()*TRANSMIT_COST);
+				}
+			}
+			{
+				cost.put("Smart Pull",0.0d);
+				TreeMap<Long, GeoPoint> tweets = trial.getValue();
+				for(long i=0; i < END ; i+= pollInterval){
+					NavigableMap<Long, GeoPoint> pulledTweets = tweets.subMap(i-pollInterval, false, i, true);
+					cost.put("Smart Pull", WAKEUP_COST +LOCATION_ANNOUNCE_COST);
+					GeoPoint location = determineLocation(i,trace);
+					for(Entry<Long, GeoPoint> tweet :pulledTweets.entrySet()){
+						GeoPoint tweetLocation = tweet.getValue();
+						if(location.distance(tweetLocation) < range){
+							Double old = cost.get("Smart Pull");
+							cost.put("Smart Pull",old + TRANSMIT_COST);
+						}
+					}
+				}
+			}
+			
+			{
+				cost.put("GeoJourney",0.0d);
+				TreeMap<Long, GeoPoint> tweets = trial.getValue();
+				GeoPoint geoFenceCenter = null;
+				double geoFenceInnerRadius = 0.0d;
+				double geoFenceOuterRadius = 0.0d;
+				
+				for(long i=0; i < END ; i++){
+					
+					//Figure out where I am
+					GeoPoint location = determineLocation(i,trace);
+					
+					//If I'm out of the geofence then update it
+					if((geoFenceCenter == null) || (location.distance(geoFenceCenter) > geoFenceInnerRadius)){
+						//Update center
+						geoFenceCenter = new GeoPoint(location);
+						geoFenceInnerRadius = (location.getSpeed() * 60)/1000; //in km
+						if(geoFenceInnerRadius < 0.025){
+							geoFenceInnerRadius = 0.025;
+						}
+						geoFenceOuterRadius = geoFenceInnerRadius *2;
+						cost.put("GeoJourney", WAKEUP_COST +LOCATION_ANNOUNCE_COST);
+					}
+					
+					//Check to see if any tweets came in
+					if(tweets.containsKey(i)){
+						GeoPoint tweet = tweets.get(i);
+						//If the server knows I'm in range, wake me up and send it
+						if(tweet.distance(geoFenceCenter) < geoFenceOuterRadius){
+							Double old = cost.get("GeoJourney");
+							cost.put("GeoJourney",old + WAKEUP_COST + TRANSMIT_COST);
+						}
+					}
+				}
+			}
+			
 			System.out.print(trial.getKey()+"\t");
 			System.out.print(cost.get("Naive Push")+"\t");
 			System.out.print(cost.get("Smart Push")+"\t");
+			System.out.print(cost.get("Naive Pull")+"\t");
+			System.out.print(cost.get("Smart Pull")+"\t");
+			System.out.print(cost.get("Static Geofence")+"\t");
+			System.out.print(cost.get("GeoJourney")+"\t");
 			System.out.println();
 		}
 		

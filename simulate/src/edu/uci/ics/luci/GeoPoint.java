@@ -3,10 +3,18 @@ package edu.uci.ics.luci;
 public class GeoPoint {
 	private double latitude;
 	private double longitude;
+	private double speed;
 	
-	GeoPoint(double latitude, double longitude){
+	GeoPoint(double latitude, double longitude, double speed){
 		setLatitude(latitude);
 		setLongitude(longitude);
+		setSpeed(speed);
+	}
+	
+	GeoPoint(GeoPoint cloneMe){
+		setLatitude(cloneMe.getLatitude());
+		setLongitude(cloneMe.getLongitude());
+		setSpeed(cloneMe.getSpeed());
 	}
 	
 	public double getLatitude() {
@@ -20,6 +28,13 @@ public class GeoPoint {
 	}
 	public void setLongitude(double longitude) {
 		this.longitude = longitude;
+	}
+	
+	public double getSpeed() {
+		return speed;
+	}
+	public void setSpeed(double speed) {
+		this.speed = speed;
 	}
 
 	public double distance(GeoPoint p) {
